@@ -1,1 +1,79 @@
+# =========================
+# OS Files
+# =========================
 .DS_Store
+.AppleDouble
+.LSOverride
+
+# =========================
+# Python
+# =========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# =========================
+# Virtual Environments
+# =========================
+.venv/
+venv/
+env/
+ENV/
+conda-meta/
+*.conda
+
+# =========================
+# Conda
+# =========================
+*.env
+.env
+.envrc
+
+# =========================
+# Jupyter
+# =========================
+.ipynb_checkpoints/
+
+# =========================
+# Logs
+# =========================
+*.log
+
+# =========================
+# Testing
+# =========================
+.coverage
+htmlcov/
+.pytest_cache/
+
+# =========================
+# ML / Data Projects
+# =========================
+data/
+datasets/
+checkpoints/
+models/
+runs/
+wandb/
+mlruns/
+
+# =========================
+# Torch / CUDA Artifacts
+# =========================
+*.pt
+*.pth
+*.ckpt
+
+# =========================
+# Temporary Files
+# =========================
+tmp/
+temp/
+*.tmp
+*.swp
