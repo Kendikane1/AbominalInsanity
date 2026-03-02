@@ -1,49 +1,52 @@
-# Inverse Bias Fix — 5-Phase Master Plan
+# Inverse Bias Fix — Master Plan
 
-**Status**: Active — implementing phase-by-phase
+**Status**: Active — trajectory pivoted to upstream diagnostics
 **Owner**: Orchestrator (Claude Code)
 **Implementer**: Antigravity Agent
 
 ## Overview
 
-Fix the inverse bias in Method D (99.6% seen→unseen misrouting) via 5 additive phases targeting internal representation equivalence.
+Fix the inverse bias in Method D (99.6% seen→unseen misrouting) via systematic investigation. Phase 1 solved calibration; the bottleneck is now upstream representation quality.
 
 ### Root Causes
 
-| ID | Mechanism | Description |
-|----|-----------|-------------|
-| M1 | Variance mismatch | tr(Σ̃_u) << tr(Σ_s) → inflated unseen weights |
-| M2 | Sample imbalance | ~20 synth/class vs ~8 real/class |
-| M3 | Max-over-classes | 200 unseen classes compound per-class leakage |
+| ID | Mechanism | Description | Status |
+|----|-----------|-------------|--------|
+| M1 | Variance mismatch | tr(Σ̃_u) << tr(Σ_s) → inflated unseen weights | Secondary — subordinate to M2 |
+| M2 | Sample imbalance | ~20 synth/class vs ~8 real/class | **SOLVED** (Phase 1) |
+| M3 | Max-over-classes | 200 unseen classes compound per-class leakage | Mitigated by M2 fix |
 
 ### Phase Summary
 
-| Phase | Name | Targets | Effort | File |
-|-------|------|---------|--------|------|
-| 0 | Evaluation Harness | Infrastructure | Low | `add_eval_harness.py` |
-| 1 | Sample Balance | M2 | Low | `add_phase1_sample_balance.py` |
-| 2 | Covariance-Aware Generator | M1 (at source) | High | `add_phase2_cov_generator.py` |
-| 3 | Cosine Classifier | M1, M3 | Moderate | `add_phase3_cosine_clf.py` |
-| 4 | Noise Injection | M1, M3 | Low | `add_phase4_noise_injection.py` |
-| 5 | Post-Hoc Calibration | Residual | Low | `add_phase5_posthoc_calib.py` |
+| Phase | Name | Targets | Effort | Status |
+|-------|------|---------|--------|--------|
+| 0 | Evaluation Harness | Infrastructure | Low | **COMPLETE** |
+| 1 | Sample Balance | M2 | Low | **COMPLETE** |
+| D | **Upstream Diagnostics** | Bottleneck ID | Low | **ACTIVE** |
+| 2 | Covariance-Aware Generator | M1 (at source) | High | PENDING — value depends on Diag results |
+| 3 | Cosine Classifier | M1, M3 | Moderate | PENDING — value depends on Diag results |
+| 4 | Noise Injection | M1, M3 | Low | PENDING — value depends on Diag results |
+| 5 | Post-Hoc Calibration | Residual | Low | **DEPRIORITISED** — calibration solved by Phase 1 |
 
-### Dependency Graph
+### Trajectory Pivot (2026-03-01)
 
-```
-Phase 0 (eval harness) ──► Phase 1 (sample balance) ──► Phase 2 (cov generator) ──► Phase 3 (cosine clf) ──► Phase 5 (post-hoc)
-                                                    └──► Phase 4 (noise injection, parallel with Phase 2)
-```
+Phase 1 results were definitive: sample count imbalance (M2) was the dominant mechanism. Balancing counts collapsed routing rate from 99.7% → ~9%, but exposed near-floor discriminative power (H ≈ 0.4%). The original 2% AccU was an artifact of predicting unseen for everything.
 
-### Success Criteria
+**New priority**: Identify the representation bottleneck before investing in Phases 2–5.
 
-- Routing rate drops from 99.6% toward ~50%
-- H-mean improves substantially over Method D
-- Weight norm distributions for seen vs unseen converge (Phase 3 guarantees)
-- Post-hoc γ* near zero (upstream fixes sufficient)
+Three candidate failure points:
+- **(A) CLIP encoder**: 64-dim embeddings may be too compressed for 1654 classes
+- **(B) WGAN-GP generator**: May be mode-collapsed, producing indiscriminable synthetics
+- **(C) Text prototypes**: 200 unseen prototypes may cluster too tightly in R^64
 
-### Detailed Phase Specs
+### Decision Framework (post-diagnostics)
 
-Full implementation details for each phase are provided in `plans/current-task.md` as each phase becomes active. The complete plan with all code sketches is preserved in the orchestrator's conversation history.
+| Diagnostic Result | Action |
+|-------------------|--------|
+| Encoder CRITICAL | Increase embed_dim, train longer, curriculum learning |
+| Generator CRITICAL | Invest in Phase 2 (cov-aware WGAN) or alternative generators |
+| Prototypes CRITICAL | Better text features, larger semantic space, alternative alignment |
+| Multiple CRITICAL | Address upstream first: prototypes → encoder → generator |
 
 ---
 
@@ -51,9 +54,11 @@ Full implementation details for each phase are provided in `plans/current-task.m
 
 | Phase | Status | Date | Notes |
 |-------|--------|------|-------|
-| 0 | ACTIVE | 2026-03-01 | First task issued |
-| 1 | ACTIVE | 2026-03-01 | Bundled with Phase 0 |
-| 2 | PENDING | — | — |
-| 3 | PENDING | — | — |
-| 4 | PENDING | — | — |
-| 5 | PENDING | — | — |
+| 0 | **COMPLETE** | 2026-03-01 | Eval harness deployed (cells 97–101) |
+| 1 | **COMPLETE** | 2026-03-01 | M2 confirmed as dominant. Routing rate 99.7% → ~9%. H ≈ 0.4% |
+| Cleanup | **COMPLETE** | 2026-03-02 | Notebook 129 → 108 cells, obsolete sections removed |
+| D | **ACTIVE** | 2026-03-02 | Upstream diagnostics task issued. 3 measurements: seen-only acc, unseen-only acc, prototype spread |
+| 2 | PENDING | — | Value TBD by diagnostics |
+| 3 | PENDING | — | Value TBD by diagnostics |
+| 4 | PENDING | — | Value TBD by diagnostics |
+| 5 | DEPRIORITISED | 2026-03-01 | Calibration already solved |
