@@ -1,6 +1,6 @@
 # Inverse Bias Fix — Master Plan
 
-**Status**: Active — trajectory pivoted to upstream diagnostics
+**Status**: Active — CLIP Encoder Optimisation phase
 **Owner**: Orchestrator (Claude Code)
 **Implementer**: Antigravity Agent
 
@@ -22,10 +22,11 @@ Fix the inverse bias in Method D (99.6% seen→unseen misrouting) via systematic
 |-------|------|---------|--------|--------|
 | 0 | Evaluation Harness | Infrastructure | Low | **COMPLETE** |
 | 1 | Sample Balance | M2 | Low | **COMPLETE** |
-| D | **Upstream Diagnostics** | Bottleneck ID | Low | **ACTIVE** |
-| 2 | Covariance-Aware Generator | M1 (at source) | High | PENDING — value depends on Diag results |
-| 3 | Cosine Classifier | M1, M3 | Moderate | PENDING — value depends on Diag results |
-| 4 | Noise Injection | M1, M3 | Low | PENDING — value depends on Diag results |
+| D | Upstream Diagnostics | Bottleneck ID | Low | **COMPLETE** |
+| E | **CLIP Encoder Optimisation** | Encoder quality | High | **ACTIVE** |
+| 2 | Covariance-Aware Generator | M1 (at source) | High | PENDING — reassess after Phase E |
+| 3 | Cosine Classifier | M1, M3 | Moderate | PENDING — reassess after Phase E |
+| 4 | Noise Injection | M1, M3 | Low | PENDING — reassess after Phase E |
 | 5 | Post-Hoc Calibration | Residual | Low | **DEPRIORITISED** — calibration solved by Phase 1 |
 
 ### Trajectory Pivot (2026-03-01)
@@ -39,14 +40,15 @@ Three candidate failure points:
 - **(B) WGAN-GP generator**: May be mode-collapsed, producing indiscriminable synthetics
 - **(C) Text prototypes**: 200 unseen prototypes may cluster too tightly in R^64
 
-### Decision Framework (post-diagnostics)
+### Diagnostic Verdict (2026-03-02)
 
-| Diagnostic Result | Action |
-|-------------------|--------|
-| Encoder CRITICAL | Increase embed_dim, train longer, curriculum learning |
-| Generator CRITICAL | Invest in Phase 2 (cov-aware WGAN) or alternative generators |
-| Prototypes CRITICAL | Better text features, larger semantic space, alternative alignment |
-| Multiple CRITICAL | Address upstream first: prototypes → encoder → generator |
+| Component | Status | Evidence |
+|-----------|--------|----------|
+| CLIP Encoder | **WEAK** (gating bottleneck) | 1.90% seen-only top-1 (31.5x above random but near-floor) |
+| WGAN-GP Generator | OK (victim, not cause) | 68.38% internal CV, 1.73% transfer — fails because encoder is diffuse |
+| Text Prototypes | OK (well-separated) | Mean cosine ≈ 0.014, adequate angular spread |
+
+**Decision**: Halt downstream fixes. Invest in CLIP Encoder Optimisation (Phase E) — two-stage parametric sweep over training dynamics and architecture.
 
 ---
 
@@ -57,8 +59,10 @@ Three candidate failure points:
 | 0 | **COMPLETE** | 2026-03-01 | Eval harness deployed (cells 97–101) |
 | 1 | **COMPLETE** | 2026-03-01 | M2 confirmed as dominant. Routing rate 99.7% → ~9%. H ≈ 0.4% |
 | Cleanup | **COMPLETE** | 2026-03-02 | Notebook 129 → 108 cells, obsolete sections removed |
-| D | **ACTIVE** | 2026-03-02 | Upstream diagnostics task issued. 3 measurements: seen-only acc, unseen-only acc, prototype spread |
-| 2 | PENDING | — | Value TBD by diagnostics |
-| 3 | PENDING | — | Value TBD by diagnostics |
-| 4 | PENDING | — | Value TBD by diagnostics |
+| D | **COMPLETE** | 2026-03-02 | Encoder = bottleneck (1.90%), generator OK (68% internal), prototypes OK |
+| Diag cells | **COMPLETE** | 2026-03-02 | 6 diagnostic cells added (108→114 cells) |
+| E | **ACTIVE** | 2026-03-02 | CLIP encoder optimisation: 2-stage sweep (14 runs) + full pipeline re-run. 12 cells to add (114→126) |
+| 2 | PENDING | — | Reassess after Phase E |
+| 3 | PENDING | — | Reassess after Phase E |
+| 4 | PENDING | — | Reassess after Phase E |
 | 5 | DEPRIORITISED | 2026-03-01 | Calibration already solved |
