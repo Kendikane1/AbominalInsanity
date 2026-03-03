@@ -1,6 +1,6 @@
 # Inverse Bias Fix — Master Plan
 
-**Status**: Active — CLIP Encoder Optimisation phase
+**Status**: Active — Phase F (Augmentation + SupCon + Architecture)
 **Owner**: Orchestrator (Claude Code)
 **Implementer**: Antigravity Agent
 
@@ -23,7 +23,8 @@ Fix the inverse bias in Method D (99.6% seen→unseen misrouting) via systematic
 | 0 | Evaluation Harness | Infrastructure | Low | **COMPLETE** |
 | 1 | Sample Balance | M2 | Low | **COMPLETE** |
 | D | Upstream Diagnostics | Bottleneck ID | Low | **COMPLETE** |
-| E | **CLIP Encoder Optimisation** | Encoder quality | High | **ACTIVE** |
+| E | CLIP Encoder Optimisation | Encoder quality | High | **COMPLETE** |
+| F | **Augmentation + SupCon + Architecture** | Generalization + signal + inductive bias | High | **ACTIVE** |
 | 2 | Covariance-Aware Generator | M1 (at source) | High | PENDING — reassess after Phase E |
 | 3 | Cosine Classifier | M1, M3 | Moderate | PENDING — reassess after Phase E |
 | 4 | Noise Injection | M1, M3 | Low | PENDING — reassess after Phase E |
@@ -61,8 +62,9 @@ Three candidate failure points:
 | Cleanup | **COMPLETE** | 2026-03-02 | Notebook 129 → 108 cells, obsolete sections removed |
 | D | **COMPLETE** | 2026-03-02 | Encoder = bottleneck (1.90%), generator OK (68% internal), prototypes OK |
 | Diag cells | **COMPLETE** | 2026-03-02 | 6 diagnostic cells added (108→114 cells) |
-| E | **ACTIVE** | 2026-03-02 | CLIP encoder optimisation: 2-stage sweep (14 runs) + full pipeline re-run. 12 cells to add (114→126) |
-| 2 | PENDING | — | Reassess after Phase E |
-| 3 | PENDING | — | Reassess after Phase E |
-| 4 | PENDING | — | Reassess after Phase E |
+| E | **COMPLETE** | 2026-03-02 | Encoder top-1: 1.90%→2.87% (+51%), H-mean: 0.42%→0.70% (+67%). Best: dim=128, LN, lr=1e-3, cosine, τ=0.15. Config integrated, sweep cells removed (126→114) |
+| F | **ACTIVE** | 2026-03-02 | Task spec complete. Three-stage sweep: F1 augmentation (9 runs), F2 SupCon loss (3 runs), F3 EEGNet/ShallowConvNet (4 runs). Targets: 5-10% encoder top-1 → H-mean 2-5%. Cells 114-124 to be injected. |
+| 2 | PENDING | — | Reassess after Phase F |
+| 3 | PENDING | — | Reassess after Phase F |
+| 4 | PENDING | — | Reassess after Phase F |
 | 5 | DEPRIORITISED | 2026-03-01 | Calibration already solved |
