@@ -1,33 +1,3 @@
-/session-kickstart
-
-  Read through CLAUDE.md and MEMORY.md thoroughly first. Then read these context
-  files in order to understand where we are:
-
-  1. @context/image-alignment-paradigm-shift-debrief.md — the most recent session
-     debrief covering the CORnet-S image alignment paradigm shift (READ THIS
-     CAREFULLY — it contains everything you need)
-  2. @context/CORnet_S_paradigm_analysis.md — detailed analysis of the first image
-     alignment run results
-  3. @context/CORnet_S_paradigm.md — raw Colab cell outputs from the run
-
-  KEY CONTEXT: We just completed a paradigm shift from EEG-to-text to EEG-to-image
-  (CORnet-S) alignment. Results: H-mean improved 7.8x (0.58% → 4.53%), AccU
-  improved 18x (0.32% → 5.73%). The pipeline works. The notebook
-  (GZSL_EEG_Pipeline_v2.ipynb, 67 cells) is fully functional with image alignment.
-
-  The recommended next steps (in priority order) are:
-  1. Hyperparameter tuning on image alignment (epochs, tau, embed_dim, architecture)
-  2. Structure-preserving WGAN-GP mathematical research (variance diffusion
-     regularisation, dual-graph Laplacian — this is my main research interest and
-     the novel contribution I want to develop)
-  3. Source CLIP image features for comparison
-  4. Routing calibration
-
-  I want to discuss the path forward and then proceed with whatever we decide.
-  Take your time absorbing everything before asking me questions.
-
-  ---
-
 
 # CORnet-S Image Alignment — First Run Analysis
 
