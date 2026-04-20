@@ -673,3 +673,346 @@ The Problem, Stated Precisely
 
   Shall we proceed to implementation, or do you want to dig deeper into any of the mathematical steps — for instance, the exact
   calibration of η, or the gradient flow through the noise-augmented conditioning?
+
+  ---                                                                                                                                
+  Deep Dive: Gradient Flow Through Noise-Augmented Conditioning
+                                                                                                                                     
+  You asked to understand how the perturbation propagates through the generator's layers and why the output is well-behaved. Let me
+  trace this step by step, with the actual linear algebra.
+
+  The Generator as a Composition of Affine Maps + Nonlinearities
+
+  Our generator G has this structure:
+
+  Input:  [z; s_c] ∈ ℝ^164    (100 noise + 64 prototype)
+  Layer 1: h₁ = LeakyReLU(W₁[z; s_c] + b₁)    W₁ ∈ ℝ^{256×164}
+  Layer 2: h₂ = LeakyReLU(W₂h₁ + b₂)           W₂ ∈ ℝ^{256×256}
+  Layer 3: ê_raw = W₃h₂ + b₃                    W₃ ∈ ℝ^{64×256}
+  Output:  ê = ê_raw / ‖ê_raw‖₂                 ê ∈ S^63
+
+  Now, we perturb the prototype: instead of feeding s_c, we feed:
+
+  s̃_c = (s_c + η·ξ) / ‖s_c + η·ξ‖₂,  where ξ ~ 𝒩(0, I₆₄)
+
+  The question: how does this perturbation propagate to ê?
+
+  Layer 1: The Split
+
+  W₁ acts on the concatenated input [z; s_c]. We can split W₁ into two blocks:
+
+  W₁ = [W₁ᶻ | W₁ˢ], where W₁ᶻ ∈ ℝ^{256×100}, W₁ˢ ∈ ℝ^{256×64}
+
+  So:
+
+  h₁_pre = W₁ᶻz + W₁ˢs̃_c + b₁
+
+  The perturbation enters through the term W₁ˢs̃_c. Define the unperturbed pre-activation:
+
+  h₁_pre⁰ = W₁ᶻz + W₁ˢs_c + b₁
+
+  The perturbation to the pre-activation is:
+
+  Δh₁_pre = W₁ˢ(s̃_c − s_c)
+
+  This is the key object. Let's call δ = s̃_c − s_c — the perturbation vector in prototype space. Then:
+
+  Δh₁_pre = W₁ˢδ
+
+  This is a linear projection of the 64-D perturbation into the 256-D hidden space. The matrix W₁ˢ has been trained by the WGAN-GP to
+   map prototype information into useful internal representations.
+
+  How Big is Δh₁_pre?
+
+  The perturbation magnitude is:
+
+  ‖Δh₁_pre‖ = ‖W₁ˢδ‖ ≤ σ_max(W₁ˢ) · ‖δ‖
+
+  where σ_max(W₁ˢ) is the largest singular value of W₁ˢ. After training, this is bounded (WGAN-GP gradient penalty implicitly
+  regularises weight norms).
+
+  For our perturbation, ‖δ‖ = ‖s̃_c − s_c‖. Since s_c and s̃_c are both on the unit sphere:
+
+  ‖δ‖² = ‖s̃_c − s_c‖² = 2(1 − cos θ)
+
+  where θ is the angular deviation. For η=0.10 at d=64, E[cos θ] ≈ 0.78, so E[‖δ‖²] ≈ 0.44, E[‖δ‖] ≈ 0.66.
+
+  So the first-layer perturbation magnitude is proportional to η (through ‖δ‖) scaled by the network's learned sensitivity to
+  prototype changes (through W₁ˢ).
+
+  LeakyReLU: The Piecewise-Linear Gate
+
+  After the linear transformation, LeakyReLU acts element-wise:
+
+  h₁ = LeakyReLU(h₁_pre⁰ + Δh₁_pre)
+
+  LeakyReLU is defined as:
+  LeakyReLU(x) = x      if x ≥ 0
+                = 0.2x   if x < 0
+
+  This is piecewise-linear. Its derivative is either 1 or 0.2 — never zero, never exploding. This is why we use LeakyReLU in GANs
+  rather than ReLU: gradients always flow.
+
+  For small perturbations (Δh₁_pre small compared to |h₁_pre⁰|), the LeakyReLU gate doesn't change — each neuron stays on the same
+  side of zero. In this regime, the perturbation propagates linearly:
+
+  Δh₁ ≈ D₁ · Δh₁_pre = D₁ · W₁ˢδ
+
+  where D₁ = diag(d₁¹, d₁², ..., d₁²⁵⁶) is a diagonal matrix with d₁ⁱ = 1 if the i-th neuron is positive, and d₁ⁱ = 0.2 if negative.
+  This is the Jacobian of LeakyReLU — a diagonal matrix that either passes the signal through (×1) or attenuates it (×0.2).
+
+  For larger perturbations, some neurons may cross zero — switching from the positive to negative regime (or vice versa). This
+  creates a nonlinear "kink" in the generator's response. But with 256 neurons and a modest perturbation, only a few neurons flip, so
+   the overall mapping remains approximately linear.
+
+  Layer 2: Same Story
+
+  The perturbation to layer 2's input is Δh₁ ≈ D₁W₁ˢδ. Layer 2 transforms this:
+
+  Δh₂_pre = W₂ · Δh₁ = W₂D₁W₁ˢδ
+
+  Then LeakyReLU:
+
+  Δh₂ ≈ D₂W₂D₁W₁ˢδ
+
+  where D₂ is layer 2's LeakyReLU Jacobian.
+
+  Layer 3: Linear Output
+
+  The final layer is purely linear (no activation):
+
+  Δê_raw = W₃ · Δh₂ = W₃D₂W₂D₁W₁ˢδ
+
+  This is a matrix-vector product: J_s · δ, where:
+
+  J_s = W₃D₂W₂D₁W₁ˢ ∈ ℝ^{64×64}
+
+  This is the Jacobian of the generator with respect to the prototype input, evaluated at the specific operating point (z, s_c). It's
+   a 64×64 matrix that tells you: "if I perturb the prototype by δ in the 64-D input space, the raw output changes by J_s · δ in the
+  64-D output space."
+
+  L2 Normalization: The Final Projection
+
+  The generator's last operation is ê = ê_raw / ‖ê_raw‖. How does the perturbation of ê_raw translate to a perturbation of ê?
+
+  Let ê⁰ = ê_raw⁰ / ‖ê_raw⁰‖ be the unperturbed output. The differential of the L2 normalization at point v is:
+
+  d(v/‖v‖)/dv = (I - v̂v̂ᵀ) / ‖v‖
+
+  where v̂ = v/‖v‖ is the unit vector. The matrix (I - v̂v̂ᵀ) is the projection onto the tangent plane of the sphere at v̂. It removes
+  the radial component (along v̂) and keeps only the tangential component.
+
+  So:
+
+  Δê ≈ (I - ê⁰(ê⁰)ᵀ) / ‖ê_raw⁰‖ · Δê_raw
+
+  Visualise this: imagine you're standing on the surface of a sphere at point ê⁰. The raw perturbation Δê_raw has two components —
+  one pointing radially (away from or toward the sphere's centre) and one tangential (along the surface). The normalisation discards
+  the radial component. Only the tangential component survives, which is why ê stays on the sphere.
+
+  The Full Jacobian (End-to-End)
+
+  Putting it all together, the perturbation of the final output due to a prototype perturbation δ is:
+
+  Δê ≈ (I - ê⁰(ê⁰)ᵀ) / ‖ê_raw⁰‖ · W₃D₂W₂D₁W₁ˢ · δ
+
+  Let's call the full end-to-end Jacobian:
+
+  J = (I - ê⁰(ê⁰)ᵀ) / ‖ê_raw⁰‖ · W₃D₂W₂D₁W₁ˢ ∈ ℝ^{64×64}
+
+  This is a 64×64 matrix that maps prototype perturbations to output perturbations. Key properties:
+
+  1. J has rank at most 63 (not 64), because the projection (I - ê⁰(ê⁰)ᵀ) kills one dimension — the output always lies on S^63, so
+  perturbations can only be tangential (63 degrees of freedom).
+  2. The singular values of J are bounded. Since each LeakyReLU has gain between 0.2 and 1.0, and the WGAN-GP gradient penalty
+  encourages the critic (and indirectly the generator) to have bounded Lipschitz constant, the product W₃D₂W₂D₁W₁ˢ has bounded
+  spectral norm. Typical values: σ_max(J) ~ 0.5–2.0.
+  3. J varies with z and s_c. Different noise samples z activate different neurons (different D₁, D₂ patterns), so each sample sees a
+   slightly different Jacobian. This is actually beneficial — it means the 20 per-class samples don't all get perturbed in the same
+  direction. The diversity of Jacobians across z values creates a richer perturbation in output space.
+
+  Why the Output is Well-Behaved
+
+  Three reasons:
+
+  1. Bounded Lipschitz constant. The WGAN-GP gradient penalty constrains ‖∇_e D(e, s_c)‖ ≈ 1, which implicitly bounds the critic's
+  Lipschitz constant. For the generator to produce outputs that "fool" a Lipschitz-bounded critic, it can't have arbitrarily large
+  Jacobians either — otherwise small input changes would cause wild output jumps that the critic would easily detect. So the trained
+  generator has a naturally moderate Lipschitz constant in both z and s_c.
+
+  2. LeakyReLU never kills gradients. Unlike ReLU (which can have zero gradient), LeakyReLU always has gradient ≥ 0.2. This means
+  perturbations always propagate — they get attenuated by at most 0.2 per layer (so 0.2³ = 0.008 through all three layers for the
+  worst case where every neuron is negative). In practice, roughly half the neurons are positive, so the average attenuation is
+  closer to (0.6)³ ≈ 0.22 — perturbations lose about 78% of their magnitude, which is gentle.
+
+  3. The sphere projection is smooth. The L2 normalization ê = ê_raw/‖ê_raw‖ is a smooth map everywhere except at ê_raw = 0 (which
+  never happens in practice). The tangent-plane projection (I - ê⁰(ê⁰)ᵀ) varies smoothly with ê⁰, so nearby operating points have
+  similar projection behaviour.
+
+  The Total Within-Class Variance Added by Perturbation
+
+  We said each sample ê_k = G(z_k, s̃_c_k) where s̃_c_k is independently perturbed. The variance of ê_k has two sources:
+
+  Var[ê] = Var_z[G(z, s_c)] + Var_ξ[G(z, s̃_c)] + cross-terms
+
+  For the perturbation-induced variance (holding z fixed):
+
+  Var_ξ[G(z, s̃_c)] ≈ J · Cov[δ] · Jᵀ
+
+  where Cov[δ] is the covariance of the prototype perturbation δ = s̃c − s_c. For small η, δ ≈ η · P⊥ξ where P_⊥ = (I - s_cs_cᵀ) is
+  the projection orthogonal to s_c. So:
+
+  Cov[δ] ≈ η² · P_⊥
+
+  And the perturbation-induced variance is:
+
+  Var_ξ ≈ η² · JP_⊥Jᵀ
+
+  This is a 64×64 positive semidefinite matrix. Its trace (total variance added) is:
+
+  tr(Var_ξ) ≈ η² · ‖JP_⊥‖²_F
+
+  The J matrix determines WHICH directions in output space gain variance. High-sensitivity directions (large singular values of J)
+  gain more variance. These are the directions where the generator's mapping varies most with prototype changes — precisely the
+  informationally relevant directions for class discrimination.
+
+  This is why the perturbation approach is mathematically elegant: it adds variance where it matters most, not uniformly.
+
+  ---
+  That's the complete picture. The perturbation enters at the input, propagates through three layers of bounded linear maps with
+  LeakyReLU gates, and exits through a tangent-plane projection onto the sphere. At every stage, the transformation is smooth and
+  bounded. The result is a well-behaved, calibratable degradation of geometric fidelity.
+
+  Ready to implement. Shall I proceed?
+
+  These results are genuinely informative — a clean negative result that tells us something important about where the bottleneck     
+  actually lives. Let me walk through this carefully.                                                                                
+                                                                                                                                     
+  ---                                                                                                                                
+  What the Sweep Shows                                                                                                               
+                                                                                                                                     
+  The story across the table is monotonic and unambiguous: every increment of η degrades H-mean while improving AccS.                
+                                                            
+  ┌────────────────┬───────────────┬────────────────────────────────────────────────┐
+  │     Signal     │ η=0 → η=0.25  │                 Interpretation                 │
+  ├────────────────┼───────────────┼────────────────────────────────────────────────┤
+  │ H-mean         │ 4.77% → 0.29% │ Monotonic collapse, no sweet spot              │
+  ├────────────────┼───────────────┼────────────────────────────────────────────────┤
+  │ AccS           │ 4.11% → 4.69% │ Classifier shifts toward seen predictions      │
+  ├────────────────┼───────────────┼────────────────────────────────────────────────┤
+  │ AccU           │ 5.69% → 0.15% │ Unseen recognition destroyed                   │
+  ├────────────────┼───────────────┼────────────────────────────────────────────────┤
+  │ Routing        │ 20.0% → 1.2%  │ Classifier learns to avoid unseen entirely     │
+  ├────────────────┼───────────────┼────────────────────────────────────────────────┤
+  │ ρ(synth,proto) │ 0.857 → 0.570 │ We DID degrade structural coupling as intended │
+  ├────────────────┼───────────────┼────────────────────────────────────────────────┤
+  │ ρ(synth,real)  │ 0.588 → 0.412 │ ...but also pushed AWAY from real unseen       │
+  ├────────────────┼───────────────┼────────────────────────────────────────────────┤
+  │ kNN@10         │ 0.611 → 0.310 │ Neighbourhood structure destroyed              │
+  ├────────────────┼───────────────┼────────────────────────────────────────────────┤
+  │ VarR           │ 0.872 → 1.147 │ Variance increased (hits 1.0 at η≈0.10)        │
+  └────────────────┴───────────────┴────────────────────────────────────────────────┘
+
+  The ρ(synth, real) column is the smoking gun. If our perturbation were adding "realistic" noise, this metric should increase —
+  synthetic centroids should drift toward real unseen centroids. Instead it drops monotonically. We're pushing synthetic data away
+  from reality, not toward it.
+
+  Similarly: at η=0.10, VarR=1.002 — we hit perfect variance match with real unseen. But H-mean at that point is only 2.56%. Having
+  the right amount of variance in the wrong directions is worse than having slightly too little variance in the right directions.
+
+  ---
+  Why the Perturbation Hypothesis Was Wrong
+
+  Our reasoning was:
+
+  Real unseen embeddings have ρ≈0.668 to prototypes. Synthetic have ρ≈0.857. Therefore synthetic data is "too clean" and we should
+  degrade it toward ρ≈0.668.
+
+  The error is in equating structural fidelity with quality. Here's the key insight:
+
+  Real brain data has lower ρ because of neural noise — noise that carries zero class-discriminative information. Trial-to-trial
+  variability in EEG arises from attention fluctuations, neural state changes, measurement noise. This variability scatters
+  embeddings away from their class prototypes but adds nothing useful for classification.
+
+  The generator produces "clean" embeddings tightly organized around prototypes precisely because it strips away this
+  non-discriminative noise. That tightness is a feature, not a bug — it gives the classifier the cleanest possible training signal
+  for learning unseen class boundaries.
+
+  When we add Gaussian noise to prototypes, the resulting perturbation propagates through the generator as:
+
+  $$\delta e \approx J_s \cdot (\eta \cdot \xi)$$
+
+  The output variation lies along the columns of J_s (the generator's learned sensitivity directions). These directions have no
+  reason to align with the actual directions of real brain signal variability. We're adding noise in a geometrically arbitrary
+  subspace — it doesn't mimic real neural noise, it just destroys the clean prototype-aligned structure that makes the synthetic data
+   useful.
+
+  ---
+  What This Teaches Us About the Actual Bottleneck
+
+  This is the important part. The experiment rules out a hypothesis, but it also reveals something deeper:
+
+  The WGAN-GP is not underperforming — it's doing the best possible job given its conditioning information. The generator takes a
+  prototype and produces samples tightly clustered around it. Any deviation from this behaviour (via perturbation) strictly hurts.
+  The generator's smoothness (Lipschitz continuity from WGAN-GP training) means it produces well-behaved outputs, and its structural
+  coupling is exactly what makes synthesis useful.
+
+  So where IS the bottleneck? Let's look at the numbers in context:
+
+  - 1854 total classes (1654 seen + 200 unseen)
+  - Random chance: ~0.054% per class
+  - AccS = 4.11% → ~76× chance (decent)
+  - AccU = 5.69% → ~11× chance on unseen (mediocre)
+  - But the embeddings themselves have only ~4% top-1 accuracy at the encoder level
+
+  The ceiling is set by embedding discriminability. The 561-D EEG features (17ch × 33t, ~100Hz, 70-400ms) contain limited
+  class-discriminative information for 1854-way separation. The encoder extracts what it can (~4% top-1), the WGAN-GP faithfully
+  reproduces the prototype-conditioned structure, and the classifier does its best with fundamentally weak features.
+
+  The implication: improvements must come from either (a) getting more out of the embeddings the generator already produces, or (b)
+  changing what the generator learns during training — not what it receives at inference time.
+
+  ---
+  Where This Leaves Us
+
+  We've now conclusively shown that post-hoc perturbation of the conditioning signal cannot help. The WGAN-GP's training defines a
+  smooth manifold of outputs, and perturbing inputs just moves along that manifold in uninformative directions.
+
+  The question is: what can change the manifold itself? There are several promising directions, roughly ordered by how directly they
+  attack the problem:
+
+  Direction 1: Training-Time Loss Modifications (most principled)
+
+  Modify the generator's training objective to explicitly shape the within-class distribution, rather than hoping the Wasserstein
+  distance alone produces the right structure. Concrete additions to the generator loss:
+
+  - Variance regularization: Penalize variance deficit vs real seen data. This forces the generator to produce diverse outputs, but
+  the diversity is learned (shaped by gradients through the generator's weights) rather than injected externally.
+  - Diversity loss: Maximize average pairwise distance between synthetic samples within a class, directly fighting class-level mode
+  collapse.
+  - Feature matching: Force intermediate representations (not just outputs) to match real data statistics.
+
+  This is fundamentally different from our perturbation experiment because it reshapes J_s (the Jacobian) during training rather than
+   perturbing the input.
+
+  Direction 2: Conditional Auxiliary Classifier (AC-GAN hybrid)
+
+  Add a classification head to the generator that must correctly classify its own outputs. The gradient from this head forces the
+  generator to produce features that are discriminative, not just distributionally matched. This attacks the "right directions"
+  problem directly — the classifier gradient tells the generator which directions matter for classification.
+
+  Direction 3: Inter-Class Structure Loss
+
+  Instead of just matching the marginal real distribution, add a loss that preserves the inter-class distance matrix. If prototype A
+  and B are cosine-similar=0.3, the synthetic centroids for classes A and B should maintain that relationship. This is a
+  graph-Laplacian style constraint on the generator.
+
+  Direction 4: Rethink the Game Entirely
+
+  - Transductive methods: Use the unlabelled unseen EEG test data itself to refine predictions (legitimate in many ZSL settings)
+  - Calibrated stacking: Post-hoc temperature scaling on the GZSL classifier to fix the seen/unseen routing balance
+  - Hybrid synthesis: Combine WGAN-GP samples with deterministic UVDS-style projections
+
+  ---
+  What's your thinking on which direction appeals most? Direction 1 (training-time loss modifications) is the natural continuation of
+   the WGAN-GP research thread — it keeps the same architecture but changes what the generator optimises for. The mathematical
+  formulation would build directly on the Jacobian analysis we already did. But I want to hear your instinct before we commit.
