@@ -3,7 +3,7 @@
 When the user requests a handover for AceBrain, generate exactly this block, verbatim, with the placeholder values replaced. No commentary outside the block.
 
 === ACE-HANDOVER v1 ===
-domain: {ace-domain-slug}
+domain: {ai-research}
 project-slug: {slug}
 project-path: {absolute-path}
 session-date: {YYYY-MM-DD}
