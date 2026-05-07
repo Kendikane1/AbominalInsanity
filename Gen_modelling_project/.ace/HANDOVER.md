@@ -19,7 +19,7 @@ tools-or-libraries-used:
   - {name}
 open-questions:
   - "{question}" [{priority-tag}]
-artefacts-to-ingest:
+artefacts-to-ingest (newly-created-files-or-folders-in-this-session):
   - {relative-path-from-repo-root}
 next-suggested-step: |
   {one-paragraph}
