@@ -6,9 +6,10 @@
 | 01 | WGAN diagnostics | Characterise synthesis quality | Complete | — |
 | 02 | Eta sweep | Post-hoc prototype perturbation fixes VarR | Failed | 4.77→2.56 |
 | 03 | Variance regularisation | L_var at training time improves VarR | Failed | 4.77→4.58 |
-| 04a | FiLM baseline | FiLM decouples noise path from prototype conditioning | Active | — |
-| 04b | FiLM + LayerNorm | LN after modulation bounds β influence on D2 | Active | — |
-| 04c | FiLM + L_var | Architecture fix + variance regularisation combined | Active | — |
+| 04a | FiLM baseline | FiLM decouples noise path from prototype conditioning | Complete | 4.69% |
+| 04b | FiLM + LayerNorm | LN after modulation bounds β influence on D2 | Complete | 4.59% |
+| 04c | FiLM + L_var | Architecture fix + variance regularisation combined | Complete | 4.62% |
+| 05 | High-Capacity FiLM | hidden_dim=512, film_hidden=256, 50K steps, L_var α=1.0 | Failed | 4.10% |
 
 Each experiment subfolder contains:
 - `README.md` — hypothesis, changes, findings, conclusion
