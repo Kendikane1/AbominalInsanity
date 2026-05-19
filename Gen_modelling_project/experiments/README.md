@@ -10,6 +10,7 @@
 | 04b | FiLM + LayerNorm | LN after modulation bounds β influence on D2 | Complete | 4.59% |
 | 04c | FiLM + L_var | Architecture fix + variance regularisation combined | Complete | 4.62% |
 | 05 | High-Capacity FiLM | hidden_dim=512, film_hidden=256, 50K steps, L_var α=1.0 | Failed | 4.10% |
+| 06 | Residual FiLM | γ=1+Δγ parameterisation + L_γ floor + film_hidden=128 | Active | — |
 
 Each experiment subfolder contains:
 - `README.md` — hypothesis, changes, findings, conclusion
