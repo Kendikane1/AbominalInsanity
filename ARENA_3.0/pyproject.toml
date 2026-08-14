@@ -1,0 +1,69 @@
+[project]
+name = "arena-chapters-0-1"
+version = "0.1.0"
+description = "Local Apple Silicon environment for ARENA Chapters 0 and 1"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "accelerate",
+  "datasets",
+  "diffusers",
+  "eindex-callum",
+  "einops",
+  "ftfy",
+  "hdbscan",
+  "huggingface-hub",
+  "imageio-ffmpeg",
+  "ipykernel",
+  "ipywidgets==7.7.1",
+  "jaxtyping",
+  "jupyter",
+  "jupyterlab-widgets==1.1.1",
+  "matplotlib",
+  "mediapy",
+  "nbformat",
+  "nnsight>=0.3.5",
+  "numpy-stl",
+  "pandas",
+  "plotly",
+  "pre-commit",
+  "pytest",
+  "requests",
+  "rich",
+  "sae-lens>=4.0.0,<5.0.0",
+  "sae-vis>=0.3.1",
+  "safetensors",
+  "scikit-learn",
+  "streamlit",
+  "tabulate",
+  "torch",
+  "torchaudio",
+  "torchinfo",
+  "torchvision",
+  "tqdm",
+  "transformer-lens==2.11.0",
+  "typeguard",
+  "umap-learn",
+  "wandb",
+]
+
+[dependency-groups]
+dev = [
+  "basedpyright",
+  "ruff",
+]
+
+[tool.uv]
+package = false
+environments = ["sys_platform == 'darwin' and platform_machine == 'arm64'"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.basedpyright]
+typeCheckingMode = "standard"
+venvPath = "."
+venv = ".venv"

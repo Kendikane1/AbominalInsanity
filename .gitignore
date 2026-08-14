@@ -17,6 +17,10 @@ __pycache__/
 .eggs/
 dist/
 build/
+.ruff_cache/
+.mypy_cache/
+.pyright/
+.hypothesis/
 
 # =========================
 # Virtual Environments
@@ -39,6 +43,7 @@ conda-meta/
 # Jupyter
 # =========================
 .ipynb_checkpoints/
+.jupyter/
 
 # =========================
 # Logs
@@ -62,6 +67,8 @@ models/
 runs/
 wandb/
 mlruns/
+artifacts/
+outputs/
 
 # =========================
 # Torch / CUDA Artifacts
@@ -71,6 +78,17 @@ mlruns/
 *.ckpt
 
 # =========================
+# JavaScript / TypeScript
+# =========================
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/
+.next/
+.turbo/
+coverage/
+
+# =========================
 # Temporary Files
 # =========================
 tmp/
@@ -78,5 +96,11 @@ temp/
 *.tmp
 *.swp
 
+# =========================
+# Local IDE state
+# =========================
+.zed/local.json
+
 #Claude
 CLAUDE.md
+!Projects/CLAUDE.md

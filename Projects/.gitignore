@@ -1,0 +1,10 @@
+# Every child is an independent Git repository; ignore it in the umbrella repo.
+/*/
+
+# Keep the master instructions tracked by the umbrella repository.
+!/.gitignore
+!/README.md
+!/PROJECT_STANDARD.md
+!/AGENTS.md
+!/CLAUDE.md
+!/GEMINI.md

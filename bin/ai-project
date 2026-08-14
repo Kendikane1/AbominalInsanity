@@ -1,0 +1,138 @@
+#!/bin/zsh
+set -eu
+
+usage() {
+  printf '%s\n' \
+    'Usage: ai-project <name-or-path> [minimal|ml|dl] [--no-sync]' \
+    '' \
+    'Profiles:' \
+    '  minimal  Python, pytest, Ruff, and basedpyright' \
+    '  ml       minimal + NumPy, pandas, scikit-learn, plotting, Jupyter' \
+    '  dl       ml + PyTorch, torchvision, einops, transformers, accelerate' \
+    '' \
+    'Examples:' \
+    '  ai-project experiments/attention-study dl' \
+    '  ai-project quick-analysis ml --no-sync'
+}
+
+if (( $# < 1 || $# > 3 )); then
+  usage
+  exit 2
+fi
+
+target=$1
+profile=${2:-ml}
+sync=true
+
+if [[ "$profile" == "--no-sync" ]]; then
+  profile=ml
+  sync=false
+elif [[ "${3:-}" == "--no-sync" ]]; then
+  sync=false
+elif (( $# == 3 )); then
+  usage
+  exit 2
+fi
+
+case "$profile" in
+  minimal|ml|dl) ;;
+  *)
+    printf 'Unknown profile: %s\n\n' "$profile" >&2
+    usage >&2
+    exit 2
+    ;;
+esac
+
+if ! command -v uv >/dev/null 2>&1; then
+  printf '%s\n' 'uv is required: https://docs.astral.sh/uv/' >&2
+  exit 1
+fi
+
+if [[ -e "$target" ]] && [[ -n "$(find "$target" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]]; then
+  printf 'Refusing to overwrite non-empty path: %s\n' "$target" >&2
+  exit 1
+fi
+
+project_name=${target:t}
+package_name=${project_name//-/_}
+package_name=${package_name// /_}
+
+if [[ ! "$package_name" =~ '^[A-Za-z_][A-Za-z0-9_]*$' ]]; then
+  printf 'Project name must produce a valid Python package name: %s\n' "$project_name" >&2
+  exit 1
+fi
+
+mkdir -p "$target"
+target=${target:A}
+
+uv init --app --name "$project_name" --python 3.12 --no-workspace "$target"
+mkdir -p \
+  "$target/src/$package_name" \
+  "$target/tests" \
+  "$target/notebooks" \
+  "$target/configs" \
+  "$target/data" \
+  "$target/outputs" \
+  "$target/.zed"
+
+if [[ -f "$target/main.py" ]]; then
+  mv "$target/main.py" "$target/src/$package_name/main.py"
+fi
+
+touch "$target/src/$package_name/__init__.py" "$target/data/.gitkeep" "$target/outputs/.gitkeep"
+
+script_dir=${0:A:h}
+template_dir="$script_dir/../templates/ai-project"
+cp "$template_dir/gitignore" "$target/.gitignore"
+cp "$template_dir/zed-settings.json" "$target/.zed/settings.json"
+cp "$template_dir/zed-tasks.json" "$target/.zed/tasks.json"
+cp "$template_dir/pre-commit-config.yaml" "$target/.pre-commit-config.yaml"
+cp "$template_dir/test_smoke.py" "$target/tests/test_smoke.py"
+sed -i '' "s/__PACKAGE__/$package_name/g" "$target/tests/test_smoke.py"
+
+cat >> "$target/pyproject.toml" <<'EOF'
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.basedpyright]
+typeCheckingMode = "standard"
+venvPath = "."
+venv = ".venv"
+EOF
+
+sync_args=()
+if [[ "$sync" == false ]]; then
+  sync_args=(--no-sync)
+fi
+
+if [[ "$profile" == "ml" || "$profile" == "dl" ]]; then
+  uv add --project "$target" "${sync_args[@]}" numpy pandas scikit-learn matplotlib seaborn plotly jupyterlab ipykernel
+fi
+
+if [[ "$profile" == "dl" ]]; then
+  cp "$template_dir/device.py" "$target/src/$package_name/device.py"
+  uv add --project "$target" "${sync_args[@]}" torch torchvision einops transformers accelerate safetensors
+fi
+
+uv add --project "$target" "${sync_args[@]}" --dev pytest pytest-cov ruff basedpyright pre-commit
+
+printf '\nCreated %s project at %s\n' "$profile" "$target"
+printf '%s\n' \
+  "Open it in Zed, then run:" \
+  "  cd ${(q)target}" \
+  '  uv sync' \
+  '  uv run pytest' \
+  '  uv run python -m '"$package_name"'.main'

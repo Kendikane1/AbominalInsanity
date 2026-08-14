@@ -1,0 +1,30 @@
+[
+  {
+    "label": "Python: test",
+    "command": "uv run pytest",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Python: lint",
+    "command": "uv run ruff check .",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Python: format",
+    "command": "uv run ruff format .",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Jupyter Lab",
+    "command": "uv run jupyter lab",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  }
+]
